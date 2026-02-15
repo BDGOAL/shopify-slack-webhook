@@ -5,10 +5,10 @@ const axios = require("axios");
 const app = express();
 app.use(bodyParser.json());
 
-// TODO：正式用時，將下面這行改成環境變數，暫時可以先直接貼 URL 測試
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
 
-;
+// 簡單防重：記錄近期已處理過的 order id（存在記憶體）
+const processedOrders = new Set();
 
 app.post("/shopify-orders", async (req, res) => {
   const order = req.body;
@@ -16,6 +16,14 @@ app.post("/shopify-orders", async (req, res) => {
   if (!order || !order.id) {
     return res.sendStatus(400);
   }
+
+  // 如果這個 order.id 已經處理過，就直接回 200，不再發 Slack
+  if (processedOrders.has(order.id)) {
+    return res.sendStatus(200);
+  }
+
+  // 新訂單：先記錄這個 id
+  processedOrders.add(order.id);
 
   const orderNumber = order.name || `#${order.id}`;
   const totalPrice = order.total_price;
